@@ -103,8 +103,17 @@ func CreateDefaultAccessor(
 		overwrite:     overwriteData,
 		pushWiki:      pushWiki}
 
+	return CreateSQLiteConnection(giteaAccessor)
+}
+
+func CreateSQLiteConnection(giteaAccessor DefaultAccessor) (*DefaultAccessor, error) {
 	// open gitea DB - currently sqlite-specific...
 	giteaDbPath := giteaAccessor.GetStringConfig("database", "PATH")
+	giteaRepoName := giteaAccessor.repoName
+	giteaUserName := giteaAccessor.userName
+	giteaWikiRepoDir := giteaAccessor.wikiRepoDir
+	giteaWikiRepoURL := giteaAccessor.wikiRepoURL
+	giteaWikiRepoToken := giteaAccessor.wikiRepoToken
 	giteaDb, err := sql.Open("sqlite3", giteaDbPath)
 	if err != nil {
 		err = errors.Wrapf(err, "opening sqlite database %s", giteaDbPath)

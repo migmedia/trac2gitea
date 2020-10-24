@@ -51,7 +51,12 @@ func CreateDefaultAccessor(tracRootDir string) (*DefaultAccessor, error) {
 
 	accessor := DefaultAccessor{db: nil, rootDir: tracRootDir, config: tracConfig}
 
+	return CreateSQLiteConnection(accessor)
+}
+
+func CreateSQLiteConnection(accessor DefaultAccessor) (*DefaultAccessor, error) {
 	// extract path to trac DB - currently sqlite-specific...
+	tracRootDir := accessor.rootDir
 	tracDatabaseString := accessor.GetStringConfig("trac", "database")
 	tracDatabaseSegments := strings.SplitN(tracDatabaseString, ":", 2)
 	tracDatabasePath := tracDatabaseSegments[1]
