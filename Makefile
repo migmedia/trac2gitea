@@ -46,6 +46,7 @@ alldeps: deps mockdeps lintdeps
 deps:
 	$(GOGET) github.com/go-ini/ini 
 	$(GOGET) github.com/mattn/go-sqlite3
+	$(GOGET) github.com/go-sql-driver/mysql
 	$(GOGET) github.com/spf13/pflag
 	$(GOGET) gopkg.in/src-d/go-git.v4
 

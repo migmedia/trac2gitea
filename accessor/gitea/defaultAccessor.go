@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-ini/ini"
 	_ "github.com/mattn/go-sqlite3" // sqlite database driver
+	_ "github.com/go-sql-driver/mysql" // mysql database driver
 	"gopkg.in/src-d/go-git.v4"
 )
 
@@ -103,40 +104,6 @@ func CreateDefaultAccessor(
 		overwrite:     overwriteData,
 		pushWiki:      pushWiki}
 
-	return CreateSQLiteConnection(giteaAccessor)
-}
-
-func CreateSQLiteConnection(giteaAccessor DefaultAccessor) (*DefaultAccessor, error) {
-	// open gitea DB - currently sqlite-specific...
-	giteaDbPath := giteaAccessor.GetStringConfig("database", "PATH")
-	giteaRepoName := giteaAccessor.repoName
-	giteaUserName := giteaAccessor.userName
-	giteaWikiRepoDir := giteaAccessor.wikiRepoDir
-	giteaWikiRepoURL := giteaAccessor.wikiRepoURL
-	giteaWikiRepoToken := giteaAccessor.wikiRepoToken
-	giteaDb, err := sql.Open("sqlite3", giteaDbPath)
-	if err != nil {
-		err = errors.Wrapf(err, "opening sqlite database %s", giteaDbPath)
-		return nil, err
-	}
-
-	// start transaction
-	log.Info("using Gitea database %s", giteaDbPath)
-	giteaAccessor.db, err = giteaDb.Begin()
-	if err != nil {
-		err = errors.Wrapf(err, "creating database transaction")
-		return nil, err
-	}
-
-	giteaRepoID, err := giteaAccessor.getRepoID(giteaUserName, giteaRepoName)
-	if err != nil {
-		return nil, err
-	}
-	if giteaRepoID == NullID {
-		return nil, fmt.Errorf("cannot find repository %s for user %s", giteaRepoName, giteaUserName)
-	}
-	giteaAccessor.repoID = giteaRepoID
-
 	// find directory into which to clone wiki
 	wikiRepoName := giteaRepoName + ".wiki"
 	if giteaWikiRepoDir == "" {
@@ -175,6 +142,37 @@ func CreateSQLiteConnection(giteaAccessor DefaultAccessor) (*DefaultAccessor, er
 	}
 	log.Info("using Wiki repo URL %s", giteaWikiRepoURL)
 	giteaAccessor.wikiRepoURL = giteaWikiRepoURL
+
+	return CreateSQLiteConnection(giteaAccessor)
+}
+
+func CreateSQLiteConnection(giteaAccessor DefaultAccessor) (*DefaultAccessor, error) {
+	// open gitea DB - currently sqlite-specific...
+	giteaDbPath := giteaAccessor.GetStringConfig("database", "PATH")
+	giteaRepoName := giteaAccessor.repoName
+	giteaUserName := giteaAccessor.userName
+	giteaDb, err := sql.Open("sqlite3", giteaDbPath)
+	if err != nil {
+		err = errors.Wrapf(err, "opening sqlite database %s", giteaDbPath)
+		return nil, err
+	}
+
+	// start transaction
+	log.Info("using Gitea database %s", giteaDbPath)
+	giteaAccessor.db, err = giteaDb.Begin()
+	if err != nil {
+		err = errors.Wrapf(err, "creating database transaction")
+		return nil, err
+	}
+
+	giteaRepoID, err := giteaAccessor.getRepoID(giteaUserName, giteaRepoName)
+	if err != nil {
+		return nil, err
+	}
+	if giteaRepoID == NullID {
+		return nil, fmt.Errorf("cannot find repository %s for user %s", giteaRepoName, giteaUserName)
+	}
+	giteaAccessor.repoID = giteaRepoID
 
 	return &giteaAccessor, nil
 }

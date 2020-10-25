@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-ini/ini"
 	_ "github.com/mattn/go-sqlite3" // sqlite database driver
+	_ "github.com/go-sql-driver/mysql" // mysql database driver
 )
 
 // DefaultAccessor is the default implementation of the trac Accessor interface, accessing Trac via its database and filestore.
