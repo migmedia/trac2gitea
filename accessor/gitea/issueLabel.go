@@ -15,7 +15,7 @@ import (
 func (accessor *DefaultAccessor) getIssueLabelID(issueID int64, labelID int64) (int64, error) {
 	var issueLabelID int64 = NullID
 	err := accessor.db.QueryRow(`
-		SELECT id FROM issue_label WHERE issue_id=$1 AND label_id=$2
+		SELECT id FROM issue_label WHERE issue_id=? AND label_id=?
 		`, issueID, labelID).Scan(&issueLabelID)
 	if err != nil && err != sql.ErrNoRows {
 		err = errors.Wrapf(err, "retrieving id of issue label for issue %d, label %d", issueID, labelID)
@@ -27,8 +27,8 @@ func (accessor *DefaultAccessor) getIssueLabelID(issueID int64, labelID int64) (
 
 // insertIssueLabel adds a new label to a Gitea issue, returns id of created issue label.
 func (accessor *DefaultAccessor) insertIssueLabel(issueID int64, labelID int64) (int64, error) {
-	_, err := accessor.db.Exec(`
-		INSERT INTO issue_label(issue_id, label_id) VALUES ( $1, $2 )`,
+	result, err := accessor.db.Exec(`
+		INSERT INTO issue_label(issue_id, label_id) VALUES ( ?, ? )`,
 		issueID, labelID)
 	if err != nil {
 		err = errors.Wrapf(err, "adding issue label for issue %d, label %d", issueID, labelID)
@@ -36,7 +36,8 @@ func (accessor *DefaultAccessor) insertIssueLabel(issueID int64, labelID int64) 
 	}
 
 	var issueLabelID int64
-	err = accessor.db.QueryRow(`SELECT last_insert_rowid()`).Scan(&issueLabelID)
+//	err = accessor.db.QueryRow(`SELECT last_insert_rowid()`).Scan(&issueLabelID)
+	issueLabelID, err = result.LastInsertId()
 	if err != nil {
 		err = errors.Wrapf(err, "retrieving id of new issue label for issue %d, label %d", issueID, labelID)
 		return NullID, err

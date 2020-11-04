@@ -52,7 +52,26 @@ func CreateDefaultAccessor(tracRootDir string) (*DefaultAccessor, error) {
 
 	accessor := DefaultAccessor{db: nil, rootDir: tracRootDir, config: tracConfig}
 
-	return CreateSQLiteConnection(accessor)
+	return CreateMySQLConnection(accessor)
+}
+
+func CreateMySQLConnection(accessor DefaultAccessor) (*DefaultAccessor, error) {
+	// extract path to trac DB - currently sqlite-specific...
+	tracDatabaseString := accessor.GetStringConfig("trac", "database")
+	tracDatabaseSegments := strings.SplitN(tracDatabaseString, "://", 2)
+	tracDatabasePath := strings.Replace(tracDatabaseSegments[1], "localhost",
+		"tcp(127.0.0.1)", 1)
+
+	log.Info("using trac database %s", tracDatabasePath)
+
+	tracDb, err := sql.Open("mysql", tracDatabasePath)
+	if err != nil {
+		err = errors.Wrapf(err, "opening Trac sqlite database %s", tracDatabasePath)
+		return nil, err
+	}
+	accessor.db = tracDb
+
+	return &accessor, nil
 }
 
 func CreateSQLiteConnection(accessor DefaultAccessor) (*DefaultAccessor, error) {

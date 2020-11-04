@@ -12,8 +12,8 @@ func (accessor *DefaultAccessor) GetTickets(handlerFn func(ticket *Ticket) error
 		SELECT
 			t.id,
 			t.type,
-			CAST(t.time*1e-6 AS int8),
-			CAST(t.changetime*1e-6 AS int8),
+			CAST(t.time*1e-6 AS int),
+			CAST(t.changetime*1e-6 AS int),
 			COALESCE(t.component, ''),
 			COALESCE(t.severity,''),
 			COALESCE(t.priority,''),

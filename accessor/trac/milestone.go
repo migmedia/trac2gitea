@@ -10,7 +10,7 @@ import "github.com/pkg/errors"
 func (accessor *DefaultAccessor) GetMilestones(handlerFn func(milestone *Milestone) error) error {
 	// NOTE: trac timestamps are to the microseconds, we just need seconds
 	rows, err := accessor.db.Query(`
-		SELECT COALESCE(name,''), COALESCE(description,''), CAST(due*1e-6 AS int8), CAST(completed*1e-6 AS int8)
+		SELECT COALESCE(name,''), COALESCE(description,''), CAST(due*1e-6 AS int), CAST(completed*1e-6 AS int)
 			FROM milestone UNION
 			SELECT distinct(COALESCE(milestone,'')),'',0,0
 				FROM ticket

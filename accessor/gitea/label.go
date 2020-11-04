@@ -16,7 +16,7 @@ import (
 func (accessor *DefaultAccessor) GetLabelID(labelName string) (int64, error) {
 	var labelID int64 = NullID
 	err := accessor.db.QueryRow(`
-		SELECT id FROM label WHERE repo_id = $1 AND name = $2
+		SELECT id FROM label WHERE repo_id = ? AND name = ?
 		`, accessor.repoID, labelName).Scan(&labelID)
 	if err != nil && err != sql.ErrNoRows {
 		err = errors.Wrapf(err, "retrieving id of label %s", labelName)
@@ -42,8 +42,8 @@ func (accessor *DefaultAccessor) updateLabel(labelID int64, label *Label) error 
 
 // insertLabel inserts a new label, returns label id.
 func (accessor *DefaultAccessor) insertLabel(label *Label) (int64, error) {
-	_, err := accessor.db.Exec(`
-		INSERT INTO label(repo_id, name, description, color) VALUES($1, $2, $3, $4)`,
+	result, err := accessor.db.Exec(`
+		INSERT INTO label(repo_id, name, description, color) VALUES(?, ?, ?, ?)`,
 		accessor.repoID, label.Name, label.Description, label.Color)
 	if err != nil {
 		err = errors.Wrapf(err, "adding label %s", label.Name)
@@ -51,12 +51,13 @@ func (accessor *DefaultAccessor) insertLabel(label *Label) (int64, error) {
 	}
 
 	var labelID int64
-	err = accessor.db.QueryRow(`SELECT last_insert_rowid()`).Scan(&labelID)
+//	err = accessor.db.QueryRow(`SELECT last_insert_rowid()`).Scan(&labelID)
+
+	labelID, err = result.LastInsertId()
 	if err != nil {
 		err = errors.Wrapf(err, "retrieving id of new label %s", label.Name)
 		return NullID, err
 	}
-
 	log.Debug("added label %s, color %s (id %d)", label.Name, label.Color, labelID)
 
 	return labelID, nil

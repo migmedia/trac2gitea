@@ -16,7 +16,7 @@ import (
 func (accessor *DefaultAccessor) GetIssueID(issueIndex int64) (int64, error) {
 	var issueID int64 = NullID
 	err := accessor.db.QueryRow(`
-		SELECT id FROM issue WHERE repo_id = $1 AND "index" = $2
+		SELECT id FROM issue WHERE repo_id = ? AND "index" = ?
 		`, accessor.repoID, issueIndex).Scan(&issueID)
 	if err != nil && err != sql.ErrNoRows {
 		err = errors.Wrapf(err, "retrieving issue with index %d", issueIndex)
@@ -68,17 +68,17 @@ func (accessor *DefaultAccessor) insertIssue(issue *Issue) (int64, error) {
 		return NullID, err
 	}
 
-	_, err = accessor.db.Exec(`
-		INSERT INTO issue("index", repo_id, name, poster_id, milestone_id, original_author_id, original_author, is_pull, is_closed, content, created_unix)
-			SELECT $1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10`,
+	result, err := accessor.db.Exec(`
+		INSERT INTO issue(` + "`index`" + `, repo_id, name, poster_id, milestone_id, original_author_id, original_author, is_pull, is_closed, content, created_unix)
+			SELECT ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?`,
 		issue.Index, accessor.repoID, issue.Summary, issue.ReporterID, milestoneID, nullOwnerID, issue.OriginalAuthorName, issue.Closed, issue.Description, issue.Created)
 	if err != nil {
 		err = errors.Wrapf(err, "adding issue with index %d", issue.Index)
 		return NullID, err
 	}
-
 	var issueID int64
-	err = accessor.db.QueryRow(`SELECT last_insert_rowid()`).Scan(&issueID)
+	//err = accessor.db.QueryRow(`SELECT last_insert_rowid()`).Scan(&issueID)
+	issueID, err = result.LastInsertId()
 	if err != nil {
 		err = errors.Wrapf(err, "retrieving id of new issue with index %d", issue.Index)
 		return NullID, err
@@ -114,7 +114,7 @@ func (accessor *DefaultAccessor) AddIssue(issue *Issue) (int64, error) {
 
 // SetIssueUpdateTime sets the update time on a given Gitea issue.
 func (accessor *DefaultAccessor) SetIssueUpdateTime(issueID int64, updateTime int64) error {
-	_, err := accessor.db.Exec(`UPDATE issue SET updated_unix = MAX(updated_unix,$1) WHERE id = $2`, updateTime, issueID)
+	_, err := accessor.db.Exec(`UPDATE issue SET updated_unix = MAX(updated_unix, ?) WHERE id = ?`, updateTime, issueID)
 	if err != nil {
 		err = errors.Wrapf(err, "setting updated time for issue %d", issueID)
 		return err
@@ -134,7 +134,7 @@ func (accessor *DefaultAccessor) UpdateIssueCommentCount(issueID int64) error {
 	_, err := accessor.db.Exec(`
 	UPDATE issue SET 
 		num_comments = (SELECT COUNT(id) FROM comment)
-		WHERE id = $1`, issueID)
+		WHERE id = ?`, issueID)
 	if err != nil {
 		err = errors.Wrapf(err, "updating number of comments for issue %d", issueID)
 		return err

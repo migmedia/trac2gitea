@@ -18,7 +18,7 @@ func (accessor *DefaultAccessor) getIssueAttachmentIDandUUID(issueID int64, file
 	var issueAttachmentID = NullID
 	var issueAttachmentUUID string
 	err := accessor.db.QueryRow(`
-		SELECT id, uuid FROM attachment WHERE issue_id = $1 AND name = $2
+		SELECT id, uuid FROM attachment WHERE issue_id = ? AND name = ?
 		`, issueID, fileName).Scan(&issueAttachmentID, &issueAttachmentUUID)
 	if err != nil && err != sql.ErrNoRows {
 		err = errors.Wrapf(err, "retrieving id for attachment %s for issue %d", fileName, issueID)
@@ -80,17 +80,18 @@ func (accessor *DefaultAccessor) updateIssueAttachment(issueAttachmentID int64, 
 
 // insertIssueAttachment creates a new attachment to a Gitea issue, returns id of created attachment
 func (accessor *DefaultAccessor) insertIssueAttachment(issueID int64, attachment *IssueAttachment, filePath string) (int64, error) {
-	_, err := accessor.db.Exec(`
+	result, err := accessor.db.Exec(`
 		INSERT INTO attachment(
 			uuid, issue_id, comment_id, name, created_unix)
-			VALUES ($1, $2, $3, $4, $5)`, attachment.UUID, issueID, attachment.CommentID, attachment.FileName, attachment.Time)
+			VALUES (?, ?, ?, ?, ?)`, attachment.UUID, issueID, attachment.CommentID, attachment.FileName, attachment.Time)
 	if err != nil {
 		err = errors.Wrapf(err, "adding attachment %s for issue %d", attachment.FileName, issueID)
 		return NullID, err
 	}
 
 	var issueAttachmentID int64
-	err = accessor.db.QueryRow(`SELECT last_insert_rowid()`).Scan(&issueAttachmentID)
+//	err = accessor.db.QueryRow(`SELECT last_insert_rowid()`).Scan(&issueAttachmentID)
+	issueAttachmentID, err = result.LastInsertId()
 	if err != nil {
 		err = errors.Wrapf(err, "retrieving id of new attachment %s for issue %d", attachment.FileName, issueID)
 		return NullID, err

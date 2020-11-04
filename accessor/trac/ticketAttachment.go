@@ -39,9 +39,9 @@ func (accessor *DefaultAccessor) GetTicketAttachmentPath(attachment *TicketAttac
 // GetTicketAttachments retrieves all attachments for a given Trac ticket, passing data from each one to the provided "handler" function.
 func (accessor *DefaultAccessor) GetTicketAttachments(ticketID int64, handlerFn func(attachment *TicketAttachment) error) error {
 	rows, err := accessor.db.Query(`
-		SELECT CAST(time*1e-6 AS int8) tim, COALESCE(author, '') author, filename, description, size
+		SELECT CAST(time*1e-6 AS int) tim, COALESCE(author, '') author, filename, description, size
 			FROM attachment
-			WHERE type = 'ticket' AND id = $1
+			WHERE type = 'ticket' AND id = ?
 			ORDER BY time asc`, ticketID)
 	if err != nil {
 		err = errors.Wrapf(err, "retrieving Trac attachments for ticket %d", ticketID)

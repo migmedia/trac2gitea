@@ -15,7 +15,7 @@ import (
 // GetMilestoneID gets the ID of a named milestone - returns NullID if no such milestone
 func (accessor *DefaultAccessor) GetMilestoneID(milestoneName string) (int64, error) {
 	var milestoneID int64 = NullID
-	err := accessor.db.QueryRow(`SELECT id FROM milestone WHERE name = $1 AND repo_id = $2`, milestoneName, accessor.repoID).Scan(&milestoneID)
+	err := accessor.db.QueryRow(`SELECT id FROM milestone WHERE name = ? AND repo_id = ?`, milestoneName, accessor.repoID).Scan(&milestoneID)
 	if err != nil && err != sql.ErrNoRows {
 		err = errors.Wrapf(err, "retrieving id of milestone %s", milestoneName)
 		return NullID, err
@@ -41,8 +41,8 @@ func (accessor *DefaultAccessor) updateMilestone(milestoneID int64, milestone *M
 
 // insertMilestone inserts a new milestone, returns milstone id.
 func (accessor *DefaultAccessor) insertMilestone(milestone *Milestone) (int64, error) {
-	_, err := accessor.db.Exec(`
-		INSERT INTO	milestone(repo_id, name, content, is_closed, deadline_unix, closed_date_unix) VALUES($1, $2, $3, $4, $5, $6)`,
+	result, err := accessor.db.Exec(`
+		INSERT INTO	milestone(repo_id, name, content, is_closed, deadline_unix, closed_date_unix) VALUES(?, ?, ?, ?, ?, ?)`,
 		accessor.repoID, milestone.Name, milestone.Description, milestone.Closed, milestone.DueTime, milestone.ClosedTime)
 	if err != nil {
 		err = errors.Wrapf(err, "adding milestone %s", milestone.Name)
@@ -50,7 +50,8 @@ func (accessor *DefaultAccessor) insertMilestone(milestone *Milestone) (int64, e
 	}
 
 	var milestoneID int64
-	err = accessor.db.QueryRow(`SELECT last_insert_rowid()`).Scan(&milestoneID)
+//	err = accessor.db.QueryRow(`SELECT last_insert_rowid()`).Scan(&milestoneID)
+	milestoneID, err = result.LastInsertId()
 	if err != nil {
 		err = errors.Wrapf(err, "retrieving id of new milestone %s", milestone.Name)
 		return NullID, err

@@ -15,7 +15,7 @@ import (
 // GetIssueCommentIDsByTime retrieves the IDs of all comments created at a given time for a given issue
 func (accessor *DefaultAccessor) GetIssueCommentIDsByTime(issueID int64, createdTime int64) ([]int64, error) {
 	rows, err := accessor.db.Query(
-		`SELECT id FROM comment WHERE issue_id = $1 AND created_unix = $2`, issueID, createdTime)
+		`SELECT id FROM comment WHERE issue_id = ? AND created_unix = ?`, issueID, createdTime)
 	if err != nil {
 		err = errors.Wrapf(err, "retrieving ids of comments created at \"%s\" for issue %d", time.Unix(createdTime, 0), issueID)
 		return []int64{}, err
@@ -69,7 +69,7 @@ func (accessor *DefaultAccessor) updateIssueComment(issueCommentID int64, issueI
 
 // insertIssueComment adds a new comment to a Gitea issue, returns id of created comment.
 func (accessor *DefaultAccessor) insertIssueComment(issueID int64, comment *IssueComment) (int64, error) {
-	_, err := accessor.db.Exec(`
+	result, err := accessor.db.Exec(`
 		INSERT INTO comment(
 			type, issue_id, poster_id, 
 			original_author_id, original_author, 
@@ -79,7 +79,7 @@ func (accessor *DefaultAccessor) insertIssueComment(issueID int64, comment *Issu
 			old_title, new_title,
 			content, 
 			created_unix, updated_unix)
-			VALUES ( $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15 )`,
+			VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )`,
 		comment.CommentType, issueID, comment.AuthorID,
 		comment.OriginalAuthorID, comment.OriginalAuthorName,
 		comment.LabelID,
@@ -94,7 +94,8 @@ func (accessor *DefaultAccessor) insertIssueComment(issueID int64, comment *Issu
 	}
 
 	var issueCommentID int64
-	err = accessor.db.QueryRow(`SELECT last_insert_rowid()`).Scan(&issueCommentID)
+//	err = accessor.db.QueryRow(`SELECT last_insert_rowid()`).Scan(&issueCommentID)
+	issueCommentID, err = result.LastInsertId()
 	if err != nil {
 		err = errors.Wrapf(err, "retrieving id of new comment \"%s\" for issue %d", comment.Text, issueID)
 		return NullID, err

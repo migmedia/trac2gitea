@@ -143,7 +143,44 @@ func CreateDefaultAccessor(
 	log.Info("using Wiki repo URL %s", giteaWikiRepoURL)
 	giteaAccessor.wikiRepoURL = giteaWikiRepoURL
 
-	return CreateSQLiteConnection(giteaAccessor)
+	return CreateMySQLConnection(giteaAccessor)
+}
+
+func CreateMySQLConnection(giteaAccessor DefaultAccessor) (*DefaultAccessor, error) {
+	// open gitea DB - mysql-specific...
+	giteaDbHost := giteaAccessor.GetStringConfig("database", "HOST")
+	giteaDbUser := giteaAccessor.GetStringConfig("database", "USER")
+	giteaDbName := giteaAccessor.GetStringConfig("database", "NAME")
+	giteaDbPasswd := giteaAccessor.GetStringConfig("database", "PASSWD")
+	giteaRepoName := giteaAccessor.repoName
+	giteaUserName := giteaAccessor.userName
+
+	giteaDbURL := fmt.Sprintf("%s:%s@tcp(%s)/%s", giteaDbUser, giteaDbPasswd,
+			giteaDbHost, giteaDbName)
+	giteaDb, err := sql.Open("mysql", giteaDbURL)
+	if err != nil {
+		err = errors.Wrapf(err, "opening mysql database %s", giteaDbURL)
+		return nil, err
+	}
+
+	// start transaction
+	log.Info("using Gitea database %s/%s", giteaDbHost, giteaDbName)
+	giteaAccessor.db, err = giteaDb.Begin()
+	if err != nil {
+		err = errors.Wrapf(err, "creating database transaction")
+		return nil, err
+	}
+
+	giteaRepoID, err := giteaAccessor.getRepoID(giteaUserName, giteaRepoName)
+	if err != nil {
+		return nil, err
+	}
+	if giteaRepoID == NullID {
+		return nil, fmt.Errorf("cannot find repository %s for user %s", giteaRepoName, giteaUserName)
+	}
+	giteaAccessor.repoID = giteaRepoID
+
+	return &giteaAccessor, nil
 }
 
 func CreateSQLiteConnection(giteaAccessor DefaultAccessor) (*DefaultAccessor, error) {

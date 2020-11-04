@@ -7,6 +7,7 @@ package gitea
 import (
 	"io"
 	"os"
+	"path"
 
 	"github.com/pkg/errors"
 	"github.com/stevejefferson/trac2gitea/log"
@@ -25,6 +26,12 @@ func copyFile(externalFilePath string, giteaPath string) error {
 		return err
 	}
 	defer in.Close()
+
+	dir := path.Dir(giteaPath)
+	_, err = os.Stat(dir)
+	if os.IsNotExist(err) {
+		os.MkdirAll(dir, os.ModePerm)
+	}
 
 	out, err := os.Create(giteaPath)
 	if err != nil {

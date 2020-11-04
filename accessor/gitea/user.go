@@ -19,7 +19,7 @@ func (accessor *DefaultAccessor) GetUserID(userName string) (int64, error) {
 	}
 
 	var id int64 = NullID
-	err := accessor.db.QueryRow(`SELECT id FROM user WHERE lower_name = $1 or email = $1`, userName).Scan(&id)
+	err := accessor.db.QueryRow(`SELECT id FROM user WHERE lower_name = ? or email = ?`, userName, userName).Scan(&id)
 	if err != nil && err != sql.ErrNoRows {
 		err = errors.Wrapf(err, "retrieving id of user %s", userName)
 		return NullID, err
@@ -31,7 +31,7 @@ func (accessor *DefaultAccessor) GetUserID(userName string) (int64, error) {
 // GetUserEMailAddress retrieves the email address of a given user
 func (accessor *DefaultAccessor) GetUserEMailAddress(userName string) (string, error) {
 	var emailAddress string = ""
-	err := accessor.db.QueryRow(`SELECT email FROM user WHERE lower_name = $1`, userName).Scan(&emailAddress)
+	err := accessor.db.QueryRow(`SELECT email FROM user WHERE lower_name = ?`, userName).Scan(&emailAddress)
 	if err != nil && err != sql.ErrNoRows {
 		err = errors.Wrapf(err, "retrieving email address of user %s", userName)
 		return "", err
@@ -52,9 +52,9 @@ func (accessor *DefaultAccessor) MatchUser(userName string, userEmail string) (s
 	lcUserName := strings.ToLower(userName)
 	err := accessor.db.QueryRow(`
 		SELECT lower_name FROM user 
-		WHERE lower_name = $1 
-		OR full_name = $2 
-		OR email = $3`, lcUserName, userName, userEmail).Scan(&matchedUserName)
+		WHERE lower_name = ?
+		OR full_name = ?
+		OR email = ?`, lcUserName, userName, userEmail).Scan(&matchedUserName)
 	if err != nil && err != sql.ErrNoRows {
 		err = errors.Wrapf(err, "trying to match user name %s, email %s", userName, userEmail)
 		return "", err

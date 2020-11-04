@@ -25,50 +25,50 @@ func sqlForFieldList(fields []TicketChangeType) string {
 }
 
 // sqlForFirstChange returns the SQL for retrieving details of the first change to a ticket
-func sqlForFirstChange() string {
+func sqlForFirstChange(ticketID int64) string {
 	// note: this query requires additional protection against NULL for case where no change exists for ticket
-	changeSQL := `
+	changeSQL := fmt.Sprintf(`
 		SELECT 0 source,
 			COALESCE(chg0.field, '') field,
 			COALESCE(chg0.oldvalue, '') value,
 			COALESCE(chg0.author, '') author,
-			COALESCE(MIN(CAST(chg0.time*1e-6 AS int8)),0) time
+			COALESCE(MIN(CAST(chg0.time*1e-6 AS int)),0) ` + "`time`" + `
 		FROM ticket_change chg0
-		WHERE chg0.ticket = $1
-		`
+		WHERE chg0.ticket = %d
+		`, ticketID)
 	return changeSQL
 }
 
 // sqlForFirstChangeToEachField returns the SQL for retrieving details of the first change to each of a set of fields of a ticket
-func sqlForFirstChangeToEachField(fields []TicketChangeType) string {
-	changeSQL := `
+func sqlForFirstChangeToEachField(fields []TicketChangeType, ticketID int64) string {
+	changeSQL := fmt.Sprintf(`
 		SELECT 1 source,
 			chg1.field field,
 			COALESCE(chg1.oldvalue, '') value,
 			COALESCE(chg1.author, '') author,
-			MIN(CAST(chg1.time*1e-6 AS int8)) time
+			MIN(CAST(chg1.time*1e-6 AS int)) ` + "`time`" + `
 		FROM ticket_change chg1
-		WHERE chg1.ticket = $1
-		AND chg1.field IN ` + sqlForFieldList(fields) + `
+		WHERE chg1.ticket = %d
+		AND chg1.field IN %s
 		GROUP BY chg1.field
-		`
+		`, ticketID, sqlForFieldList(fields))
 
 	return changeSQL
 }
 
 // sqlForTicketTableField returns the SQL for retrieving each of set of fields of a ticket in the same format as the the other queries above
-func sqlForTicketTableField(fieldIndex int, field TicketChangeType) string {
+func sqlForTicketTableField(fieldIndex int, field TicketChangeType, ticketID int64) string {
 	table := fmt.Sprintf("t%d", fieldIndex)
 	strField := string(field)
-	return `
+	return fmt.Sprintf(`
 		SELECT 2 source,
 			'` + strField + `' field,
 			COALESCE(` + table + `.` + strField + `, '') value,
 			COALESCE(` + table + `.owner, '') author,
-			CAST(` + table + `.time*1e-6 AS int8) time
+			CAST(` + table + `.time*1e-6 AS int) ` + "`time`" + `
 		FROM ticket ` + table + `
-		WHERE id=$1
-		`
+		WHERE id = %d
+		`, ticketID)
 }
 
 var initialTicketChangeFields = []TicketChangeType{
@@ -96,17 +96,17 @@ func (accessor *DefaultAccessor) getInitialTicketChanges(ticketID int64, handler
 	// If this exists, its author and time values are used to sign any data returned from the main ticket table (source 2 above).
 	// This is because the author and time in the main ticket table refer to the latest change to the ticket table not the earliest.
 	initialValueSQL := `
-		SELECT source, field, value, author, time FROM 
+		SELECT source, field, value, author, `+"`time`" + ` FROM
 		(`
-	initialValueSQL = initialValueSQL + sqlForFirstChange() + `UNION` + sqlForFirstChangeToEachField(initialTicketChangeFields)
+	initialValueSQL = initialValueSQL + sqlForFirstChange(ticketID) + `UNION` + sqlForFirstChangeToEachField(initialTicketChangeFields, ticketID)
 	for fieldIndex, field := range initialTicketChangeFields {
-		initialValueSQL = initialValueSQL + `UNION` + sqlForTicketTableField(fieldIndex, field)
+		initialValueSQL = initialValueSQL + `UNION` + sqlForTicketTableField(fieldIndex, field, ticketID)
 	}
-	initialValueSQL = initialValueSQL + `) ORDER BY source asc`
+	initialValueSQL = initialValueSQL + `) as list ORDER BY source asc`
 
-	rows, err := accessor.db.Query(initialValueSQL, ticketID)
+	rows, err := accessor.db.Query(initialValueSQL)
 	if err != nil {
-		err = errors.Wrapf(err, "retrieving initial changes for ticket %d", ticketID)
+		err = errors.Wrapf(err, "retrieving initial changes for ticket %d \n%s", ticketID, initialValueSQL)
 		return err
 	}
 
@@ -179,18 +179,18 @@ var recordedTicketChangeFields = []TicketChangeType{
 
 // getRecordedTicketChanges retrieves all changes on a given ticket recorded by Trac in ascending time order, passing data from each to a "handler" function.
 func (accessor *DefaultAccessor) getRecordedTicketChanges(ticketID int64, handlerFn func(change *TicketChange) error) error {
-	rows, err := accessor.db.Query(`
-		SELECT field, COALESCE(author, ''), COALESCE(oldvalue, ''), COALESCE(newvalue, ''), CAST(time*1e-6 AS int8)
+	sql := `
+		SELECT field, COALESCE(author, ''), COALESCE(oldvalue, ''), COALESCE(newvalue, ''), CAST(time*1e-6 AS int)
 			FROM ticket_change
-			WHERE ticket = $1
+			WHERE ticket = ?
 			AND (
-				(field = '`+string(TicketCommentChange)+`' AND trim(COALESCE(newvalue, ''), ' ') != '')
+				(field = '`+string(TicketCommentChange)+`' AND trim(COALESCE(newvalue, '')) != '')
 				OR field IN `+sqlForFieldList(recordedTicketChangeFields)+`
 			)
-			ORDER BY time asc`,
-		ticketID)
+			ORDER BY time asc`
+	rows, err := accessor.db.Query(sql, ticketID)
 	if err != nil {
-		err = errors.Wrapf(err, "retrieving Trac comments for ticket %d", ticketID)
+		err = errors.Wrapf(err, "retrieving Trac comments for ticket %d %s", ticketID, sql)
 		return err
 	}
 
@@ -231,7 +231,7 @@ func (accessor *DefaultAccessor) GetTicketChanges(ticketID int64, handlerFn func
 func (accessor *DefaultAccessor) GetTicketCommentTime(ticketID int64, commentNum int64) (int64, error) {
 	timestamp := int64(0)
 	err := accessor.db.QueryRow(`
-		SELECT time FROM ticket_change where ticket = $1 AND oldvalue = $2 AND field = 'comment'`,
+		SELECT time FROM ticket_change where ticket = ? AND oldvalue = ? AND field = 'comment'`,
 		ticketID, commentNum).Scan(&timestamp)
 	if err != nil && err != sql.ErrNoRows {
 		err = errors.Wrapf(err, "retrieving Trac comment number %d for ticket %d", commentNum, ticketID)

@@ -15,7 +15,7 @@ import (
 func (accessor *DefaultAccessor) getIssueAssigneeID(issueID int64, assigneeID int64) (int64, error) {
 	var issueAssigneeID int64 = NullID
 	err := accessor.db.QueryRow(`
-		SELECT id FROM issue_assignees WHERE issue_id = $1 AND assignee_id = $2
+		SELECT id FROM issue_assignees WHERE issue_id = ? AND assignee_id = ?
 		`, issueID, assigneeID).Scan(&issueAssigneeID)
 	if err != nil && err != sql.ErrNoRows {
 		err = errors.Wrapf(err, "retrieving id for issue %d/assignee %d", issueID, assigneeID)
@@ -41,7 +41,7 @@ func (accessor *DefaultAccessor) updateIssueAssignee(issueAssigneeID int64, issu
 // insertIssueAssignee adds a new assignee to a Gitea issue
 func (accessor *DefaultAccessor) insertIssueAssignee(issueID int64, assigneeID int64) error {
 	_, err := accessor.db.Exec(`
-		INSERT INTO issue_assignees(issue_id, assignee_id) VALUES ($1, $2)`,
+		INSERT INTO issue_assignees(issue_id, assignee_id) VALUES (?, ?)`,
 		issueID, assigneeID)
 	if err != nil {
 		err = errors.Wrapf(err, "adding user %d as assignee for issue id %d", assigneeID, issueID)

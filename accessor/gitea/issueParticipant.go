@@ -15,7 +15,7 @@ import (
 func (accessor *DefaultAccessor) getIssueParticipantID(issueID int64, userID int64) (int64, error) {
 	var issueParticipantID = NullID
 	err := accessor.db.QueryRow(`
-		SELECT id FROM issue_user WHERE issue_id = $1 AND uid = $2
+		SELECT id FROM issue_user WHERE issue_id = ? AND uid = ?
 		`, issueID, userID).Scan(&issueParticipantID)
 	if err != nil && err != sql.ErrNoRows {
 		err = errors.Wrapf(err, "retrieving id for participant %d in issue %d", userID, issueID)
@@ -42,7 +42,7 @@ func (accessor *DefaultAccessor) updateIssueParticipant(issueParticipantID int64
 // insertIssueParticipant creates a new issue participant
 func (accessor *DefaultAccessor) insertIssueParticipant(issueID int64, userID int64) error {
 	_, err := accessor.db.Exec(`
-		INSERT INTO issue_user(issue_id, uid, is_read, is_mentioned) VALUES ($1, $2, 1, 0)`,
+		INSERT INTO issue_user(issue_id, uid, is_read, is_mentioned) VALUES (?, ?, 1, 0)`,
 		issueID, userID)
 	if err != nil {
 		err = errors.Wrapf(err, "adding participant %d in issue %d", userID, issueID)
